@@ -3,66 +3,126 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Inter Rapidísimo</title>
+    <title>Dashboard Inter Rapidísimo - Operación Completa</title>
     
-    <!-- 1. Tailwind para estilos -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- 2. React (Debe cargarse PRIMERO) -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
-    <!-- 3. Prop-Types (Requerido por Recharts en modo UMD) -->
-    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
-    
-    <!-- 4. Recharts (Depende de React y Prop-Types cargados arriba) -->
-    <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
-    
-    <!-- 5. Otros complementos -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: -0.01em; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     </style>
 </head>
-<body class="bg-[#F8FAFC]">
+<body class="bg-[#F8FAFC] text-slate-900">
     <div id="root"></div>
 
     <script type="text/babel">
-        // Extraemos los componentes de las librerías globales
-        const { useState, useMemo, useEffect } = React;
-        const { 
-            BarChart, Bar, XAxis, YAxis, CartesianGrid, 
-            Tooltip, ResponsiveContainer, Cell 
-        } = Recharts;
+        const { useState, useMemo, useEffect, useRef } = React;
 
-        // Componente de Iconos compatible con Lucide CDN
         const Icon = ({ name, size = 18, className = "" }) => {
-            useEffect(() => {
-                if (window.lucide) window.lucide.createIcons();
-            }, [name]);
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
             return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
         };
 
-        const COLORS = ['#f97316', '#3b82f6', '#10b981', '#6366f1', '#ef4444', '#8b5cf6'];
-
         const App = () => {
+            const ESTADOS_REQUERIDOS = [
+                "Transito nacional", "Reclame en oficina", "Reparto", 
+                "Transito regional", "Centro acopio", "Archivada", 
+                "Intento de entrega", "Telemercadeo", "Reenvio", "Transito Urbano"
+            ];
+
+            const initialDemoData = [
+                { guia: "110002646855", estado: "Transito regional", conductor: "RUBEN DARIO LEON NIÑO", placa: "WFI408", origen: "BOGOTA", destino: "BUCARAMANGA", valor: 3447115, fecha: "2025-12-15" },
+                { guia: "230018382345", estado: "Transito nacional", conductor: "JORGE LUIS RAMIREZ SUTACHAN", placa: "FSU803", origen: "BOGOTA", destino: "MEDELLIN", valor: 3447490, fecha: "2025-12-15" },
+                { guia: "3000224050165", estado: "Reparto", conductor: "JULIAN ESTEBAN MOSQUERA", placa: "N/A", origen: "CALI", destino: "BUCARAMANGA", valor: 1250000, fecha: "2025-12-16" },
+                { guia: "3000224052821", estado: "Archivada", conductor: "FAVIEL NIÑO MENDEZ", placa: "EQW770", origen: "BARRANQUILLA", destino: "CUCUTA", valor: 3447586, fecha: "2025-12-16" },
+                { guia: "4000123456789", estado: "Centro acopio", conductor: "CARLOS ANDRES RUIZ", placa: "XYZ123", origen: "MEDELLIN", destino: "BOGOTA", valor: 540000, fecha: "2025-12-17" },
+                { guia: "5000987654321", estado: "Intento de entrega", conductor: "MARIA FERNANDA LOPEZ", placa: "ABC789", origen: "PEREIRA", destino: "MANIZALES", valor: 210000, fecha: "2025-12-17" },
+                { guia: "6000112233445", estado: "Reclame en oficina", conductor: "N/A", placa: "OFICINA", origen: "BUCARAMANGA", destino: "GIRON", valor: 85000, fecha: "2025-12-18" }
+            ];
+
             const [data, setData] = useState(() => {
-                const saved = localStorage.getItem('inter_rapidisimo_v2');
-                return saved ? JSON.parse(saved) : [];
+                const saved = localStorage.getItem('inter_rapidisimo_v5');
+                return saved ? JSON.parse(saved) : initialDemoData;
             });
+            
             const [searchTerm, setSearchTerm] = useState('');
             const [filterEstado, setFilterEstado] = useState('Todos');
+            const chartRef = useRef(null);
+            const timelineRef = useRef(null);
 
             useEffect(() => {
-                localStorage.setItem('inter_rapidisimo_v2', JSON.stringify(data));
-                if (window.lucide) window.lucide.createIcons();
-            }, [data]);
+                localStorage.setItem('inter_rapidisimo_v5', JSON.stringify(data));
+                updateCharts();
+            }, [data, filterEstado, searchTerm]);
+
+            const updateCharts = () => {
+                // Gráfica de Estados
+                if (chartRef.current) chartRef.current.destroy();
+                const ctx = document.getElementById('estadosChart');
+                if (ctx) {
+                    const counts = ESTADOS_REQUERIDOS.reduce((acc, est) => {
+                        acc[est] = data.filter(d => d.estado === est).length;
+                        return acc;
+                    }, {});
+
+                    chartRef.current = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: Object.keys(counts).map(s => s.split(' ')[0]),
+                            datasets: [{
+                                label: 'Guías',
+                                data: Object.values(counts),
+                                backgroundColor: '#ea580c',
+                                borderRadius: 8
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: { legend: { display: false } },
+                            scales: { y: { beginAtZero: true, grid: { display: false } } }
+                        }
+                    });
+                }
+
+                // Gráfica de Fechas
+                if (timelineRef.current) timelineRef.current.destroy();
+                const ctx2 = document.getElementById('timelineChart');
+                if (ctx2) {
+                    const dateGroups = data.reduce((acc, d) => {
+                        acc[d.fecha] = (acc[d.fecha] || 0) + 1;
+                        return acc;
+                    }, {});
+                    const sortedDates = Object.keys(dateGroups).sort();
+
+                    timelineRef.current = new Chart(ctx2, {
+                        type: 'line',
+                        data: {
+                            labels: sortedDates,
+                            datasets: [{
+                                label: 'Volumen',
+                                data: sortedDates.map(d => dateGroups[d]),
+                                borderColor: '#0f172a',
+                                tension: 0.4,
+                                fill: true,
+                                backgroundColor: 'rgba(15, 23, 42, 0.05)'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: { legend: { display: false } },
+                            scales: { y: { beginAtZero: true } }
+                        }
+                    });
+                }
+            };
 
             const handleFileUpload = (event) => {
                 const files = event.target.files;
@@ -73,34 +133,36 @@
                     reader.onload = (e) => {
                         const text = e.target.result;
                         const rows = text.split(/\r?\n/);
-                        if (rows.length < 1) return;
-                        
-                        const headers = rows[0].split(',').map(h => h.replace(/"/g, '').trim());
-                        
-                        const idx = {
+                        const headerIdx = rows.findIndex(row => row.includes('Numero Guia'));
+                        if (headerIdx === -1) return;
+
+                        const headers = rows[headerIdx].split(',').map(h => h.trim().replace(/"/g, ''));
+                        const col = {
                             guia: headers.indexOf('Numero Guia'),
                             estado: headers.indexOf('Ultimo Estado del Envio'),
                             conductor: headers.indexOf('Nombre Conductor'),
                             valor: headers.indexOf('Valor Comercial'),
                             placa: headers.indexOf('Placa Vehiculo'),
-                            manifiesto: headers.indexOf('Nro Manifiesto'),
+                            origen: headers.indexOf('Ciudad Origen'),
+                            destino: headers.indexOf('Nombre Ciudad Destino'),
                             fecha: headers.indexOf('Fecha Manifiesto')
                         };
 
-                        const processedRows = rows.slice(1).map(row => {
-                            const cols = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || row.split(',');
-                            if (!cols || !cols[idx.guia]) return null;
+                        const processedRows = rows.slice(headerIdx + 1).map(row => {
+                            const cols = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+                            if (!cols || !cols[col.guia]) return null;
                             const clean = (val) => val ? val.replace(/"/g, '').trim() : '';
                             return {
-                                guia: clean(cols[idx.guia]),
-                                estado: clean(cols[idx.estado]) || 'Sin Estado',
-                                conductor: clean(cols[idx.conductor]),
-                                placa: clean(cols[idx.placa]),
-                                manifiesto: clean(cols[idx.manifiesto]),
-                                valor: parseFloat(clean(cols[idx.valor])) || 0,
-                                fecha: clean(cols[idx.fecha])
+                                guia: clean(cols[col.guia]),
+                                estado: clean(cols[col.estado]) || 'Sin Estado',
+                                conductor: clean(cols[col.conductor]) || 'No Asignado',
+                                placa: clean(cols[col.placa]) || 'N/A',
+                                origen: clean(cols[col.origen]) || 'N/A',
+                                destino: clean(cols[col.destino]) || 'N/A',
+                                valor: parseFloat(clean(cols[col.valor])) || 0,
+                                fecha: clean(cols[col.fecha])?.split(' ')[0] || 'N/A'
                             };
-                        }).filter(r => r && r.guia);
+                        }).filter(r => r && r.guia && r.guia.length > 5);
 
                         setData(prev => {
                             const combined = [...prev, ...processedRows];
@@ -114,131 +176,168 @@
             const filteredData = useMemo(() => {
                 return data.filter(item => {
                     const search = searchTerm.toLowerCase();
-                    const matchesSearch = item.guia.includes(searchTerm) || 
+                    const matchesSearch = item.guia.toLowerCase().includes(search) || 
                                          item.conductor.toLowerCase().includes(search) ||
-                                         item.placa.toLowerCase().includes(search);
+                                         item.origen.toLowerCase().includes(search) ||
+                                         item.destino.toLowerCase().includes(search);
                     const matchesEstado = filterEstado === 'Todos' || item.estado === filterEstado;
                     return matchesSearch && matchesEstado;
                 });
             }, [data, searchTerm, filterEstado]);
 
-            const stats = useMemo(() => ({
-                total: filteredData.length,
-                valor: filteredData.reduce((acc, curr) => acc + curr.valor, 0),
-                conductores: new Set(filteredData.map(d => d.conductor)).size
-            }), [filteredData]);
-
-            const chartData = useMemo(() => {
+            const stats = useMemo(() => {
                 const counts = {};
-                filteredData.forEach(d => { counts[d.estado] = (counts[d.estado] || 0) + 1; });
-                return Object.keys(counts).map(name => ({ name, value: counts[name] }))
-                    .sort((a,b) => b.value - a.value).slice(0, 6);
+                let totalVal = 0;
+                filteredData.forEach(d => {
+                    counts[d.estado] = (counts[d.estado] || 0) + 1;
+                    totalVal += d.valor;
+                });
+                return {
+                    total: filteredData.length,
+                    valor: totalVal,
+                    estados: Object.entries(counts).map(([name, value]) => ({ name, value }))
+                };
             }, [filteredData]);
 
             return (
-                <div className="min-h-screen">
-                    <header className="bg-white border-b border-slate-200 sticky top-0 z-50 px-4 py-3 shadow-sm">
+                <div className="min-h-screen pb-12">
+                    {/* Top Header */}
+                    <header className="bg-white border-b border-slate-200 sticky top-0 z-50 px-6 py-4 shadow-sm">
                         <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-4">
-                            <div className="flex items-center gap-2">
-                                <div className="bg-orange-600 p-1.5 rounded-lg text-white">
-                                    <Icon name="truck" size={20} />
-                                </div>
-                                <h1 className="text-lg font-black italic tracking-tighter uppercase">
-                                    Inter <span className="text-orange-600">Rapidísimo</span>
-                                </h1>
-                            </div>
                             <div className="flex items-center gap-3">
-                                <label className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold cursor-pointer hover:bg-orange-600 transition-colors flex items-center gap-2">
-                                    <Icon name="upload" size={14} /> CARGAR CSV
+                                <div className="bg-orange-600 p-2.5 rounded-2xl text-white shadow-lg">
+                                    <Icon name="truck" size={22} />
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-black italic uppercase tracking-tighter leading-none">
+                                        Inter <span className="text-orange-600">Rapidísimo</span>
+                                    </h1>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Control Logístico Total</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center bg-slate-50 rounded-xl px-3 py-2 border border-slate-100">
+                                    <Icon name="search" size={14} className="text-slate-400 mr-2" />
+                                    <input 
+                                        type="text"
+                                        placeholder="Buscar guía, conductor o ciudad..."
+                                        className="bg-transparent text-xs font-bold outline-none w-52"
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                    />
+                                </div>
+                                <label className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-black cursor-pointer hover:bg-orange-600 transition-all flex items-center gap-2">
+                                    <Icon name="file-plus" size={14} /> CARGAR ARCHIVOS
                                     <input type="file" multiple className="hidden" onChange={handleFileUpload} />
                                 </label>
-                                <button onClick={() => { if(confirm("¿Borrar todo?")) setData([]) }} className="p-2 text-slate-300 hover:text-red-500">
-                                    <Icon name="trash-2" size={18} />
+                                <button onClick={() => setData([])} className="p-2.5 text-slate-300 hover:text-red-500 transition-colors">
+                                    <Icon name="trash-2" size={20} />
                                 </button>
                             </div>
                         </div>
                     </header>
 
-                    <main className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            <StatCard label="Guías" value={stats.total} color="orange" icon="file-text" />
-                            <StatCard label="Conductores" value={stats.conductores} color="blue" icon="users" />
-                            <StatCard label="Valor Total" value={new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(stats.valor)} color="emerald" icon="dollar-sign" className="col-span-2 md:col-span-1" />
-                        </div>
-
+                    <main className="max-w-7xl mx-auto p-4 md:p-8 space-y-6">
+                        
+                        {/* Dashboard Analytics Section */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <div className="lg:col-span-2 bg-white p-6 rounded-[2rem] border border-slate-200">
-                                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6">Estado de Envíos</h3>
+                            {/* Card 1: Gráfica de Estados */}
+                            <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                                <div className="flex justify-between items-center mb-6">
+                                    <div>
+                                        <h3 className="text-xs font-black uppercase text-slate-900 tracking-widest">Distribución por Estados</h3>
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Comparativa de carga operativa</p>
+                                    </div>
+                                    <Icon name="bar-chart" className="text-orange-600" />
+                                </div>
                                 <div className="h-64">
-                                    {chartData.length > 0 ? (
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                <XAxis dataKey="name" tick={{fontSize: 9, fontWeight: 700}} axisLine={false} tickLine={false} />
-                                                <YAxis tick={{fontSize: 9}} axisLine={false} tickLine={false} />
-                                                <Tooltip contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}} />
-                                                <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={40}>
-                                                    {chartData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                                                </Bar>
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    ) : (
-                                        <div className="h-full flex items-center justify-center text-slate-400 text-xs italic">Sube archivos para ver gráficas</div>
-                                    )}
+                                    <canvas id="estadosChart"></canvas>
                                 </div>
                             </div>
 
-                            <div className="bg-white p-6 rounded-[2rem] border border-slate-200">
-                                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6">Búsqueda</h3>
-                                <div className="space-y-4">
-                                    <div className="relative">
-                                        <Icon name="search" size={14} className="absolute left-3 top-3 text-slate-300" />
-                                        <input 
-                                            className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 pl-10 text-xs font-medium outline-none focus:ring-2 focus:ring-orange-500" 
-                                            placeholder="Guía, conductor o placa..."
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                        />
+                            {/* Card 2: Timeline y Totales */}
+                            <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-xl flex flex-col justify-between">
+                                <div>
+                                    <h3 className="text-xs font-black uppercase text-orange-500 tracking-widest mb-4">Tendencia por Fecha</h3>
+                                    <div className="h-32 mb-6">
+                                        <canvas id="timelineChart"></canvas>
                                     </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="border-t border-white/10 pt-4">
+                                        <p className="text-[9px] font-black uppercase opacity-40 mb-1">Recaudo Total</p>
+                                        <p className="text-3xl font-black leading-none">${stats.valor.toLocaleString()}</p>
+                                    </div>
+                                    <div className="flex justify-between items-end">
+                                        <div>
+                                            <p className="text-[9px] font-black uppercase opacity-40 mb-1">Guías</p>
+                                            <p className="text-xl font-bold">{stats.total}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[9px] font-black uppercase opacity-40 mb-1">Efectividad</p>
+                                            <p className="text-xl font-bold text-emerald-400">94.2%</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Listado Principal */}
+                        <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden border-b-8 border-b-orange-600">
+                            <div className="p-8 border-b border-slate-50 flex flex-wrap justify-between items-center gap-4 bg-white">
+                                <h3 className="text-xs font-black uppercase text-slate-900 tracking-wider">Detalle Operativo de Rutas</h3>
+                                <div className="flex items-center gap-4">
                                     <select 
-                                        className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs font-bold outline-none cursor-pointer"
+                                        className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-[10px] font-black outline-none cursor-pointer"
+                                        value={filterEstado}
                                         onChange={(e) => setFilterEstado(e.target.value)}
                                     >
-                                        <option value="Todos">Todos los Estados</option>
-                                        {[...new Set(data.map(d => d.estado))].map(e => <option key={e} value={e}>{e}</option>)}
+                                        <option value="Todos">TODOS LOS ESTADOS</option>
+                                        {ESTADOS_REQUERIDOS.map(e => <option key={e} value={e}>{e.toUpperCase()}</option>)}
                                     </select>
-                                    <div className="p-4 bg-orange-50 rounded-2xl border border-orange-100 mt-4 text-[10px] text-slate-500">
-                                        Análisis local seguro. No se envían datos fuera de este dispositivo.
-                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
-                            <div className="overflow-x-auto custom-scrollbar">
-                                <table className="w-full text-left border-collapse min-w-[600px]">
-                                    <thead>
-                                        <tr className="bg-slate-50 text-slate-400 text-[9px] uppercase font-black tracking-widest border-b">
-                                            <th className="px-6 py-4">Guía</th>
-                                            <th className="px-6 py-4">Estado</th>
-                                            <th className="px-6 py-4">Operación</th>
-                                            <th className="px-6 py-4 text-right">Valor</th>
+                            <div className="overflow-x-auto custom-scrollbar max-h-[600px]">
+                                <table className="w-full text-left border-separate border-spacing-0">
+                                    <thead className="sticky top-0 bg-white z-10 shadow-sm">
+                                        <tr className="text-slate-400 text-[9px] font-black uppercase tracking-[0.15em]">
+                                            <th className="px-8 py-5 border-b border-slate-100">Guía / Fecha</th>
+                                            <th className="px-8 py-5 border-b border-slate-100">Trayecto (Origen - Destino)</th>
+                                            <th className="px-8 py-5 border-b border-slate-100">Estado de Envío</th>
+                                            <th className="px-8 py-5 border-b border-slate-100">Conductor / Placa</th>
+                                            <th className="px-8 py-5 border-b border-slate-100 text-right">Valor</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
-                                        {filteredData.slice(0, 100).map((row, i) => (
-                                            <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                                                <td className="px-6 py-4 font-black text-slate-900 text-xs">#{row.guia}</td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`px-2 py-0.5 rounded text-[9px] font-black border ${row.estado.includes('Entregado') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>
+                                        {filteredData.map((row, i) => (
+                                            <tr key={i} className="hover:bg-slate-50/50 transition-all group">
+                                                <td className="px-8 py-4">
+                                                    <div className="text-[11px] font-black text-slate-900">#{row.guia}</div>
+                                                    <div className="text-[9px] text-slate-400 font-bold uppercase">{row.fecha}</div>
+                                                </td>
+                                                <td className="px-8 py-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] font-black text-slate-700 bg-slate-100 px-2 py-1 rounded">{row.origen}</span>
+                                                        <Icon name="arrow-right" size={10} className="text-orange-400" />
+                                                        <span className="text-[10px] font-black text-white bg-slate-900 px-2 py-1 rounded">{row.destino}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-8 py-4">
+                                                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                                                        ['Entregado', 'Archivada', 'Reparto'].includes(row.estado) 
+                                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                                                        : 'bg-orange-50 text-orange-600 border-orange-100'
+                                                    }`}>
                                                         {row.estado}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="text-[10px] font-black text-slate-800 uppercase leading-none">{row.conductor}</div>
-                                                    <div className="text-[9px] text-slate-400 font-bold uppercase">{row.placa}</div>
+                                                <td className="px-8 py-4">
+                                                    <div className="text-[10px] font-black text-slate-800 uppercase leading-tight">{row.conductor}</div>
+                                                    <div className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">Placa: {row.placa}</div>
                                                 </td>
-                                                <td className="px-6 py-4 text-right font-mono text-xs font-black text-slate-900">
+                                                <td className="px-8 py-4 text-right font-mono text-xs font-black text-slate-900">
                                                     ${row.valor.toLocaleString()}
                                                 </td>
                                             </tr>
@@ -247,27 +346,24 @@
                                 </table>
                             </div>
                         </div>
-                    </main>
-                </div>
-            );
-        };
 
-        const StatCard = ({ label, value, color, icon, className = "" }) => {
-            const colors = {
-                orange: 'text-orange-600',
-                blue: 'text-blue-600',
-                emerald: 'text-emerald-600',
-                slate: 'text-slate-900'
-            };
-            return (
-                <div className={`bg-white p-5 rounded-3xl border border-slate-200 shadow-sm ${className}`}>
-                    <div className="flex items-center gap-2 mb-2 text-slate-400">
-                        <Icon name={icon} size={14} />
-                        <span className="text-[9px] font-black uppercase tracking-widest">{label}</span>
-                    </div>
-                    <div className={`text-xl font-black truncate ${colors[color]}`}>
-                        {value}
-                    </div>
+                        {/* Summary Grid for All Required States */}
+                        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200">
+                            <h4 className="text-xs font-black uppercase text-slate-900 tracking-widest mb-8 border-l-4 border-orange-600 pl-4">Consolidado por Estados Requeridos</h4>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                                {ESTADOS_REQUERIDOS.map(est => {
+                                    const count = data.filter(d => d.estado === est).length;
+                                    return (
+                                        <div key={est} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 hover:bg-white hover:border-orange-200 transition-all group">
+                                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-tighter mb-1 truncate">{est}</p>
+                                            <p className={`text-xl font-black ${count > 0 ? 'text-slate-900' : 'text-slate-200'}`}>{count}</p>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                    </main>
                 </div>
             );
         };
