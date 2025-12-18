@@ -549,7 +549,17 @@ Control Logístico Total de INTER RAPIDÍSIMO.
                         <span className="text-slate-600">{row.origen}</span>
                         <span className="text-orange-500">→</span>
                         <span className="text-slate-900">{row.destino}</span>
-                      </div>
+                    );
+            })}
+          </div>
+        </div>
+
+      </main>
+    </div>
+  );
+};
+
+export default Dashboard;>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase ${
@@ -585,4 +595,14 @@ Control Logístico Total de INTER RAPIDÍSIMO.
               return (
                 <div 
                   key={estado} 
-                  className={`p-4 rounded-xl border
+                  className={`p-4 rounded-xl border-2 transition-all ${
+                    count > 0 
+                      ? 'bg-white border-orange-200 hover:border-orange-400 hover:shadow-md' 
+                      : 'bg-slate-50 border-slate-100'
+                  }`}
+                >
+                  <p className="text-[9px] font-black text-slate-400 uppercase mb-1 truncate">{estado}</p>
+                  <p className={`text-2xl font-black ${count > 0 ? 'text-slate-900' : 'text-slate-300'}`}>
+                    {count}
+                  </p>
+                </div
